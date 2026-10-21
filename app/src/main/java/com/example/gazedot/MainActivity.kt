@@ -89,8 +89,8 @@ class MainActivity : Activity() {
         // --- Sliders ---
         root.addView(section("Apariencia y velocidad"))
         addSlider(root, "Tamaño", Prefs.K_SIZE, 20, 200, Prefs.DEF_SIZE, " dp")
-        addSlider(root, "Opacidad", Prefs.K_OPACITY, 10, 100, Prefs.DEF_OPACITY, " %")
-        addSlider(root, "Velocidad", Prefs.K_SPEED, 1, 100, Prefs.DEF_SPEED, "")
+        addSlider(root, "Opacidad", Prefs.K_OPACITY, 1, 100, Prefs.DEF_OPACITY, " %")
+        addSlider(root, "Velocidad", Prefs.K_SPEED, 1, 500, Prefs.DEF_SPEED, "")
 
         // --- Teclas ---
         root.addView(section("Teclas de control"))
