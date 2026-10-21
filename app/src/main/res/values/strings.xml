@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GazeDot</string>
+    <string name="service_description">Muestra un círculo flotante sobre cualquier app y lo mueve con las teclas del teclado conectado. No lee ni guarda el contenido de la pantalla.</string>
+</resources>
