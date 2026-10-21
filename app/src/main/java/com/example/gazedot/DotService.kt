@@ -2,12 +2,15 @@ package com.example.gazedot
 
 import android.accessibilityservice.AccessibilityService
 import android.content.SharedPreferences
+import android.content.res.Configuration
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.DisplayMetrics
+import android.view.Display
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -28,6 +31,8 @@ class DotService : AccessibilityService() {
 
     private var cx = 0f
     private var cy = 0f
+    private var lastW = 0
+    private var lastH = 0
     private var sizePx = 0
     private var speed = Prefs.DEF_SPEED
     private var density = 1f
@@ -41,6 +46,8 @@ class DotService : AccessibilityService() {
 
     private val prefsListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> loadPrefs() }
+
+    private val screenChanged = Runnable { onScreenChanged() }
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -92,12 +99,21 @@ class DotService : AccessibilityService() {
             PixelFormat.TRANSLUCENT
         )
         lp.gravity = Gravity.TOP or Gravity.START
+        if (Build.VERSION.SDK_INT >= 30) {
+            lp.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        } else if (Build.VERSION.SDK_INT >= 28) {
+            lp.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
         dot = view
         params = lp
 
         loadPrefs()
 
         val (w, h) = screenSize()
+        lastW = w
+        lastH = h
         cx = w / 2f
         cy = h / 2f
         lp.x = (cx - sizePx / 2f).toInt()
@@ -110,6 +126,27 @@ class DotService : AccessibilityService() {
         }
 
         Prefs.get(this).registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Se llama dos veces: a veces las medidas nuevas tardan unos milisegundos en actualizarse.
+        onScreenChanged()
+        handler.removeCallbacks(screenChanged)
+        handler.postDelayed(screenChanged, 300)
+    }
+
+    private fun onScreenChanged() {
+        if (dot == null) return
+        val (w, h) = screenSize()
+        if (lastW > 0 && lastH > 0 && (w != lastW || h != lastH)) {
+            cx = cx / lastW * w
+            cy = cy / lastH * h
+        }
+        lastW = w
+        lastH = h
+        clampPosition()
+        updatePosition()
     }
 
     private fun loadPrefs() {
@@ -135,15 +172,12 @@ class DotService : AccessibilityService() {
     }
 
     private fun screenSize(): Pair<Int, Int> {
-        return if (Build.VERSION.SDK_INT >= 30) {
-            val b = wm.currentWindowMetrics.bounds
-            Pair(b.width(), b.height())
-        } else {
-            val m = DisplayMetrics()
-            @Suppress("DEPRECATION")
-            wm.defaultDisplay.getRealMetrics(m)
-            Pair(m.widthPixels, m.heightPixels)
-        }
+        val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
+        val display = dm.getDisplay(Display.DEFAULT_DISPLAY)
+        val m = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        display.getRealMetrics(m)
+        return Pair(m.widthPixels, m.heightPixels)
     }
 
     private fun clampPosition() {
@@ -203,6 +237,7 @@ class DotService : AccessibilityService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
+        handler.removeCallbacks(screenChanged)
         held.clear()
         Prefs.get(this).unregisterOnSharedPreferenceChangeListener(prefsListener)
         val view = dot
